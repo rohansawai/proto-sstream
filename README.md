@@ -42,16 +42,6 @@ A Change Data Capture (CDC) system that captures database changes in real-time a
 | Admin Dashboard | Django 4.2 |
 | Language | Python 3.11+ |
 
-## Components
-
-| Service | File | Description |
-|---------|------|-------------|
-| Ingestor | `ingestor.py` | Reads PostgreSQL WAL, pushes to Redis + Kafka |
-| Worker | `worker.py` | Consumes events from Redis Streams |
-| Kafka Consumer | `kafka_consumer.py` | Consumes events from Kafka |
-| Replayer | `replayer.py` | gRPC server that replays events |
-| Admin | `control/` | Django admin to manage replay jobs |
-
 ## Quick Start
 
 ### Prerequisites
@@ -127,29 +117,6 @@ docker exec -it cdc-stream-postgres psql -U repluser -d shadowdb -c \
 4. Save, select the job, and run "Run selected replay jobs"
 5. Watch events replay in the Replayer terminal
 
-## Project Structure
-
-```
-cdc-stream/
-├── docker-compose.yml      # All infrastructure + services
-├── Dockerfile              # Python services container
-├── requirements.txt        # Python dependencies
-├── proto/
-│   └── cdc.proto           # Protobuf + gRPC definitions
-├── ingestor.py             # WAL reader → Redis + Kafka
-├── worker.py               # Redis Stream consumer
-├── kafka_consumer.py       # Kafka consumer
-├── replayer.py             # gRPC replay server
-└── control/                # Django admin
-    ├── control/
-    │   └── settings.py
-    └── replay/
-        ├── models.py       # ReplayJob model
-        └── admin.py        # Replay admin action
-```
-
-## How It Works
-
 ### 1. Change Data Capture
 
 The ingestor connects to PostgreSQL using a **logical replication slot** with the `test_decoding` output plugin. This streams every INSERT, UPDATE, and DELETE as it happens.
@@ -172,18 +139,6 @@ The Django admin:
 1. Queries Redis for events in a time range
 2. Sends each event to the gRPC Replayer
 3. Replayer processes and logs the event (extensible to write to target DB)
-
-## Configuration
-
-Environment variables (set in docker-compose.yml):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `POSTGRES_HOST` | postgres | PostgreSQL host |
-| `POSTGRES_PORT` | 5432 | PostgreSQL port |
-| `REDIS_URL` | redis://redis:6379/0 | Redis connection URL |
-| `KAFKA_BROKER` | kafka:9092 | Kafka broker address |
-| `REPLAYER_HOST` | replayer:50051 | gRPC replayer address |
 
 ## License
 
