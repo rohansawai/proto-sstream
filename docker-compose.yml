@@ -1,0 +1,19 @@
+version: '3.8'
+services:
+  postgres:
+    image: debezium/postgres:15
+    environment:
+      POSTGRES_USER: repluser
+      POSTGRES_PASSWORD: replpass
+      POSTGRES_DB: shadowdb
+    command:
+      - "postgres"
+      - "-c"
+      - "wal_level=logical"
+    ports:
+      - "5434:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
