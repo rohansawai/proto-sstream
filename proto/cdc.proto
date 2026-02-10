@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package cdc;
+
+// The Replayer service - receives events and "replays" them
+service Replayer {
+    rpc ReplayEvent(ReplayRequest) returns (ReplayResponse);
+}
+
+// A single database change
+message ChangeRecord {
+    string lsn = 1;              // Log Sequence Number
+    int64 commit_time = 2;       // When the change happened (ms)
+    string table = 3;            // Table name
+    string operation = 4;        // INSERT, UPDATE, DELETE
+    string raw_data = 5;         // The raw change data
+}
+
+// Request to replay an event
+message ReplayRequest {
+    string job_id = 1;           // ID of the replay job
+    ChangeRecord event = 2;      // The event to replay
+    int64 virtual_time = 3;      // Simulated time for replay
+}
+
+// Response from replayer
+message ReplayResponse {
+    bool success = 1;
+    string message = 2;
+}

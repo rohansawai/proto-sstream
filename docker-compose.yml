@@ -1,7 +1,7 @@
-version: '3.8'
-services:
+services:  
   postgres:
-    image: debezium/postgres:15
+    image: postgres:15
+    container_name: cdc-stream-postgres
     environment:
       POSTGRES_USER: repluser
       POSTGRES_PASSWORD: replpass
@@ -12,8 +12,112 @@ services:
       - "wal_level=logical"
     ports:
       - "5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U repluser -d shadowdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7
+    container_name: cdc-stream-redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: cdc-stream-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9094,EXTERNAL://0.0.0.0:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports:
+      - "9093:9093"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+
+  ingestor:
+    build: .
+    container_name: cdc-stream-ingestor
+    command: python ingestor.py
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: cdc-stream-worker
+    command: python worker.py
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  kafka-consumer:
+    build: .
+    container_name: cdc-stream-kafka-consumer
+    command: python kafka_consumer.py
+    environment:
+      KAFKA_BROKER: kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: unless-stopped
+
+  replayer:
+    build: .
+    container_name: cdc-stream-replayer
+    command: python replayer.py
+    ports:
+      - "50051:50051"
+    restart: unless-stopped
+
+  admin:
+    build: .
+    container_name: cdc-stream-admin
+    command: >
+      sh -c "cd control && 
+             python manage.py migrate --noinput &&
+             python manage.py shell -c \"from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', '', 'admin')\" &&
+             python manage.py runserver 0.0.0.0:8001"
+    ports:
+      - "8001:8001"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      REPLAYER_HOST: replayer:50051
+    depends_on:
+      - redis
+      - replayer
+    restart: unless-stopped
+
+volumes:
+  pgdata:

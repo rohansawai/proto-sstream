@@ -1,0 +1,13 @@
+# Database
+psycopg2-binary==2.9.11
+
+# Message Queues
+redis==7.1.1
+kafka-python==2.0.2
+
+# gRPC
+grpcio==1.78.0
+grpcio-tools==1.78.0
+
+# Django
+django==4.2.21
