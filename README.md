@@ -1,5 +1,9 @@
 # CDC Stream
 
+{Durable, Low-latenct} - Choose two
+
+Database time machine — capture, store, and replay every change.
+
 A Change Data Capture (CDC) system that captures database changes in real-time and enables controlled replay of historical events.
 
 ## What It Does
